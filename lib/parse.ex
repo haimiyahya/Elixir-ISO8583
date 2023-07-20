@@ -111,7 +111,7 @@ defmodule ElixirISO8583.Parse do
 
   # bitmap parsing
   def bmp(:ascii, msg = <<first_char::8, _rest::binary>>)
-    when first_char > ?1 and first_char < ?8  # if the first bit is not set, the message only contains first bmp
+    when first_char > ?1 and first_char < ?8 do # if the first bit is not set, the message only contains first bmp
     <<bitmap::binary-size(16), rest::binary>> = msg
     {bitmap_to_list(Base.decode16!(bitmap)), rest}
   end

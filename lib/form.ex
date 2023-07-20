@@ -2,7 +2,46 @@ defmodule ElixirISO8583.Form do
 
   require Integer
 
-  def form_field(data, scheme, head_size, data_type, max) do
+  # supply the field_spec like this {pos, head_size, data_type, max} :
+  # [{2, 2, :num, 19}, {3, 0, :num, 6}]
+
+  def form_msg(msg_map, scheme, master_spec) do
+    spec = Map.keys(msg_map) |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
+
+    form_msg(msg_map, scheme, spec, <<>>)
+  end
+
+  def form_msg(_msg_map, _scheme, [], output) do
+    output
+  end
+
+  def form_msg(msg_map, scheme, spec, output) do
+
+    [{pos, head_size, data_type, max} | rest_spec] = spec
+
+    field_val = Map.fetch!(msg_map, pos)
+    formed_field = form(field_val, scheme, head_size, data_type, max)
+
+    form_msg(msg_map, scheme, rest_spec, output <> formed_field) # call itself with the next list of field spec
+  end
+
+  def get_msg_field_spec(pos_list, master_list) do
+    get_msg_field_spec(pos_list, master_list, [])
+  end
+
+  def get_msg_field_spec([], _master_list, output) do
+    output
+  end
+
+  def get_msg_field_spec(pos_list, master_list, output) do
+
+    [head | tail] = pos_list
+
+    spec = Enum.find(master_list, fn {x, _, _, _} -> x == head end)
+    get_msg_field_spec(tail, master_list, [spec | output])
+  end
+
+  def form(data, scheme, head_size, data_type, max) do
     head_val = head_val_from_data(data, head_size, max)
     data = pad_data(data, head_size, data_type, max)
 
@@ -181,16 +220,16 @@ defmodule ElixirISO8583.Form do
     bmp =
       for i <- list_of_bits, do: <<i::1>>, into: <<>>
 
-    prettify(bmp)
+    tidy(bmp)
   end
 
-  def prettify(<<first_bmp::binary-size(8), 0::64 >>) do # remove the second bmp
+  def tidy(<<first_bmp::binary-size(8), 0::64 >>) do # remove the second bmp if all the last 64 bits are zeroes
     first_bmp
   end
 
-  def prettify(bmp) do # set the first bit
+  def tidy(bmp) do # set the first bit
     <<_first_bit::1, next7bit::7, the_rest::binary>> = bmp
-    <<1::1, next7bit::7, the_rest::binary>>
+    <<1::1, next7bit::7, the_rest::binary>> # set the first bit
   end
 
 end
