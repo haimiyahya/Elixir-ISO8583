@@ -1,9 +1,11 @@
 defmodule ElixirISO8583.Parse do
 
   def parse_msg(msg, scheme, master_spec) do
-    spec = bmp(scheme, msg) |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
+    {list_of_pos, msg_data} = bmp(scheme, msg)
 
-    parse_fields(msg, scheme, spec, <<>>)
+    spec = list_of_pos |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
+
+    parse_fields(msg_data, scheme, spec, %{})
   end
 
   def parse_fields(_msg, _scheme, [], output) do
@@ -22,6 +24,7 @@ defmodule ElixirISO8583.Parse do
     when head_size in [0, 1, 2, 3, 4] do
 
     {data_length, rest} = head(msg, scheme, head_size)
+
     data_length = data_length(data_length, max) # either use head size of fixed length (use max)
     body(rest, scheme, data_type, data_length) # get body value
 
@@ -36,7 +39,8 @@ defmodule ElixirISO8583.Parse do
 
   def head(<<_a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) # 3 digits is 2 bytes, first nible is ignored
     when b >= 0 and b <= 9 and c >= 0 and c <= 9 and d >= 0 and d <= 9 do
-    data_length = b*100 + c*10 + d
+
+      data_length = b*100 + c*10 + d
     {data_length, rest}
   end
 
@@ -69,6 +73,7 @@ defmodule ElixirISO8583.Parse do
 
     <<data::binary-size(byte_length), rest::binary>> = msg
     data = Base.encode16(data) |> truncate(data_length)
+
     {data, rest}
   end
 
@@ -126,11 +131,11 @@ defmodule ElixirISO8583.Parse do
     {bitmap_to_list(Base.decode16!(bitmap)), rest}
   end
 
-  def bmp(:binary, <<0::1, bmp::63, rest::binary>>) do
+  def bmp(:bin, <<0::1, bmp::63, rest::binary>>) do
     {bitmap_to_list(<<0::1, bmp::63>>), rest} # if the first bit is not set, the message only contains first bmp
   end
 
-  def bmp(:binary, <<1::1, bmp::127, rest::binary>>) do
+  def bmp(:bin, <<1::1, bmp::127, rest::binary>>) do
     {bitmap_to_list(<<0::1, bmp::127>>), rest} # the msg contains both bitmap
   end
 
