@@ -3,7 +3,7 @@ defmodule TestingMacros.MixProject do
 
   def project do
     [
-      app: :testing_macros,
+      app: :elixir_iso8583,
       version: "0.1.0",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
