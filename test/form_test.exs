@@ -140,16 +140,21 @@ defmodule FormTest do
   end
 
   test "test form msg" do
-    msg_map = %{2 => "1234567890123456", 42 => "123456789012345"}
+    msg_map = %{2 => "1234567890123456", 41 => "12345678", 42 => "123456789012345"}
     scheme = :bin
-    master_spec = [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
+    master_spec = [{2, 2, :num, 19}, {41, 0, :alphanum, 8}, {42, 0, :alphanum, 15}]
 
     manually_formed = Base.decode16!("16") <> Base.decode16!("1234567890123456")
+    manually_formed = manually_formed <> "12345678"
     manually_formed = manually_formed <> "123456789012345"
 
-    formed = Form.form_msg(msg_map, scheme, master_spec)
-
+    formed = Form.form_fields(msg_map, scheme, master_spec)
     assert(formed == manually_formed)
+
+    manually_formed = <<0b01000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b11000000, 0b00000000, 0b00000000>> <> manually_formed
+    formed = Form.form_msg(msg_map, scheme, master_spec)
+    assert(formed == manually_formed)
+
   end
 
 end

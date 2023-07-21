@@ -7,22 +7,28 @@ defmodule ElixirISO8583.Form do
 
   def form_msg(msg_map, scheme, master_spec) do
     spec = Map.keys(msg_map) |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
+    bitmap = form_bitmap(msg_map)
+    fields = form_fields(msg_map, scheme, spec)
 
-    form_msg(msg_map, scheme, spec, <<>>)
+    bitmap <> fields
   end
 
-  def form_msg(_msg_map, _scheme, [], output) do
+  def form_fields(msg_map, scheme, spec) do
+    form_fields(msg_map, scheme, spec, <<>>)
+  end
+
+  def form_fields(_msg_map, _scheme, [], output) do
     output
   end
 
-  def form_msg(msg_map, scheme, spec, output) do
+  def form_fields(msg_map, scheme, spec, output) do
 
     [{pos, head_size, data_type, max} | rest_spec] = spec
 
     field_val = Map.fetch!(msg_map, pos)
     formed_field = form(field_val, scheme, head_size, data_type, max)
 
-    form_msg(msg_map, scheme, rest_spec, output <> formed_field) # call itself with the next list of field spec
+    form_fields(msg_map, scheme, rest_spec, output <> formed_field) # call itself with the next list of field spec
   end
 
   def get_msg_field_spec(pos_list, master_list) do

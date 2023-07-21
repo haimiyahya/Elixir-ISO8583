@@ -137,7 +137,7 @@ defmodule ParseTest do
 
     msg_multiple = msg_multiple <> msg
 
-    _result = Parse.parse_msg(msg_multiple, :ascii, [{2, 3, :br, 40}, {3, 0, :br, 18}], %{})
+    _result = Parse.parse_fields(msg_multiple, :ascii, [{2, 3, :br, 40}, {3, 0, :br, 18}], %{})
 
     #IO.inspect result
 

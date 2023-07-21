@@ -1,15 +1,20 @@
 defmodule ElixirISO8583.Parse do
 
-  def parse_msg(_msg, _scheme, [], output) do
+  def parse_msg(msg, scheme, master_spec) do
+    spec = bmp(scheme, msg) |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
+
+    parse_fields(msg, scheme, spec, <<>>)
+  end
+
+  def parse_fields(_msg, _scheme, [], output) do
     output # return the parsed msg
   end
 
-  def parse_msg(msg, scheme, list_of_field_spec, output) do
-
-    [{pos, head_size, data_type, max} | rest_list_of_field_spec] = list_of_field_spec
+  def parse_fields(msg, scheme, spec, output) do
+    [{pos, head_size, data_type, max} | rest_of_spec] = spec
     {data, rest_of_msg} = field(msg, scheme, head_size, data_type, max)
     output = Map.put(output, pos, data)
-    parse_msg(rest_of_msg, scheme, rest_list_of_field_spec, output) # call itself with the next list of field spec
+    parse_fields(rest_of_msg, scheme, rest_of_spec, output) # call itself with the next list of field spec
 
   end
 
@@ -135,6 +140,22 @@ defmodule ElixirISO8583.Parse do
     |> Enum.map(fn {a, b} -> {b, a} end)
     |> Enum.filter(fn {_, b} -> b == 1 end)
     |> Enum.map(fn {a, _} -> a end)
+  end
+
+  def get_msg_field_spec(pos_list, master_list) do
+    get_msg_field_spec(pos_list, master_list, [])
+  end
+
+  def get_msg_field_spec([], _master_list, output) do
+    output
+  end
+
+  def get_msg_field_spec(pos_list, master_list, output) do
+
+    [head | tail] = pos_list
+
+    spec = Enum.find(master_list, fn {x, _, _, _} -> x == head end)
+    get_msg_field_spec(tail, master_list, [spec | output])
   end
 
 end
