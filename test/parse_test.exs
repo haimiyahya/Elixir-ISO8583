@@ -168,4 +168,71 @@ defmodule ParseTest do
     IO.inspect parsed
 
   end
+
+  test "parse testing cpay signon" do
+    master_spec = [
+      {2, 2, :num, 19},
+      {3, 0, :num, 6},
+      {4, 0, :num, 12},
+      {7, 0, :num, 10},
+      {11, 0, :num, 6},
+      {12, 0, :num, 6},
+      {13, 0, :num, 4},
+      {14, 0, :num, 4},
+      {15, 0, :num, 4},
+      {17, 0, :num, 4},
+      {18, 0, :num, 4},
+      {22, 0, :num, 3},
+      {23, 0, :num, 3},
+      {25, 0, :num, 2},
+      {27, 0, :num, 1},
+      {30, 0, :num, 9},
+      {32, 2, :num, 11},
+      {35, 2, :num, 37},
+      {37, 0, :num, 12},
+      {38, 0, :num, 6},
+      {39, 0, :num, 2},
+      {41, 0, :alphanum, 16},
+      {42, 0, :alphanum, 15},
+      {43, 0, :alphanum, 40},
+      {48, 3, :alphanum, 30},
+      {49, 0, :alphanum, 3},
+      {50, 0, :alphanum, 3},
+      {52, 0, :alphanum, 16},
+      {53, 0, :alphanum, 16},
+      {54, 3, :alphanum, 12},
+      {55, 3, :br, 999},
+      {60, 0, :alphanum, 19},
+      {61, 0, :alphanum, 22},
+      {64, 0, :alphanum, 16},
+      {66, 0, :alphanum, 1},
+      {70, 0, :alphanum, 3},
+      {74, 0, :alphanum, 10},
+      {75, 0, :alphanum, 10},
+      {76, 0, :alphanum, 10},
+      {77, 0, :alphanum, 10},
+      {80, 0, :alphanum, 10},
+      {81, 0, :alphanum, 10},
+      {86, 0, :alphanum, 16},
+      {87, 0, :alphanum, 16},
+      {88, 0, :alphanum, 16},
+      {89, 0, :alphanum, 16},
+      {90, 0, :alphanum, 42},
+      {97, 0, :alphanum, 17},
+      {99, 2, :alphanum, 11},
+      {100, 2, :alphanum, 11},
+      {120, 0, :alphanum, 9},
+      {123, 3, :alphanum, 153},
+      {125, 0, :alphanum, 15},
+      {128, 0, :alphanum, 16},
+    ]
+
+    msg = <<130, 32, 0, 0, 0, 1, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 48, 55, 50, 51, 48, 49, 49,
+    57, 49, 53, 48, 48, 48, 52, 53, 49, 48, 49, 57, 48, 49, 54, 48, 49, 49, 49,
+    48, 48, 48, 49, 49, 50, 77, 49, 48, 48, 48, 48, 48, 48, 49>>
+
+    Parse.parse_msg(msg, :ascii, master_spec)
+
+  end
+
 end

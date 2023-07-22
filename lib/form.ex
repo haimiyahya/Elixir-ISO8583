@@ -7,7 +7,7 @@ defmodule ElixirISO8583.Form do
 
   def form_msg(msg_map, scheme, master_spec) do
     spec = Map.keys(msg_map) |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
-    bitmap = form_bitmap(msg_map)
+    bitmap = form_bitmap(msg_map) |> encode_bmp(scheme)
     fields = form_fields(msg_map, scheme, spec)
 
     bitmap <> fields
@@ -236,6 +236,14 @@ defmodule ElixirISO8583.Form do
   def tidy(bmp) do # set the first bit
     <<_first_bit::1, next7bit::7, the_rest::binary>> = bmp
     <<1::1, next7bit::7, the_rest::binary>> # set the first bit
+  end
+
+  def encode_bmp(bmp, :ascii) do
+    Base.encode16!(bmp)
+  end
+
+  def encode_bmp(bmp, _) do
+    bmp
   end
 
 end
