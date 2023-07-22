@@ -239,7 +239,7 @@ defmodule ElixirISO8583.Form do
   end
 
   def encode_bmp(bmp, :ascii) do
-    Base.encode16!(bmp)
+    Base.encode16(bmp)
   end
 
   def encode_bmp(bmp, _) do
