@@ -5,6 +5,8 @@ defmodule ElixirISO8583.Parse do
 
     spec = list_of_pos |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
 
+    IO.inspect spec
+
     parse_fields(msg_data, scheme, spec, %{})
   end
 
@@ -62,12 +64,16 @@ defmodule ElixirISO8583.Parse do
   end
 
   ## parse body
-  def body(msg, _scheme, _data_type = :alphanum, data_length) do # alphanum always 1 byte for any scheme
-    <<data::binary-size(data_length), rest::binary>> = msg
+  def body(msg, _scheme, _data_type = :alphanum, data_length) when byte_size(msg) >= data_length do # alphanum always 1 byte for any scheme
+
+  IO.inspect Base.encode16(msg)
+  IO.inspect data_length
+
+  <<data::binary-size(data_length), rest::binary>> = msg
     {data, rest}
   end
 
-  def body(msg, _scheme = :bin, data_type, data_length) # scheme binary, numeric and track2 for each digit is represented with half byte
+  def body(msg, _scheme = :bin, data_type, data_length) when byte_size(msg) >= div(data_length + rem(data_length, 2), 2) # scheme binary, numeric and track2 for each digit is represented with half byte
     when data_type in [:num, :z] do
     byte_length = data_length + rem(data_length, 2) |> div(2)
 
@@ -77,28 +83,32 @@ defmodule ElixirISO8583.Parse do
     {data, rest}
   end
 
-  def body(msg, _scheme = :bin, _data_type = :b, data_length) do # scheme binary, binary data represented as raw binary
+  def body(msg, _scheme = :bin, _data_type = :b, data_length) when byte_size(msg) >= data_length do # scheme binary, binary data represented as raw binary
     <<data::binary-size(data_length), rest::binary>> = msg
     {data, rest}
   end
 
-  def body(msg, _scheme = :ascii, data_type, data_length) # scheme ascii, numeric and track2 for each digit is represented with 1 byte
+  def body(msg, _scheme = :ascii, data_type, data_length) when byte_size(msg) >= data_length # scheme ascii, numeric and track2 for each digit is represented with 1 byte
    when data_type in [:num, :z] do
     <<data::binary-size(data_length), rest::binary>> = msg
     {data, rest}
   end
 
-  def body(msg, _scheme = :ascii, _data_type = :b, data_length) do # scheme ascii, binary data represented as hex in ascii
+  def body(msg, _scheme = :ascii, _data_type = :b, data_length) when byte_size(msg) >= data_length*2 do # scheme ascii, binary data represented as hex in ascii
     data_length = data_length*2
     <<data::binary-size(data_length), rest::binary>> = msg
     data = Base.decode16!(data)
     {data, rest}
   end
 
-  def body(msg, _scheme = :ascii, _data_type = :br, data_length) do # scheme ascii, raw binary data represented as raw binary
+  def body(msg, _scheme = :ascii, _data_type = :br, data_length) when byte_size(msg) >= data_length do # scheme ascii, raw binary data represented as raw binary
     data_length = data_length
     <<data::binary-size(data_length), rest::binary>> = msg
     {data, rest}
+  end
+
+  def body(msg, _scheme, _data_type, _data_length) do
+    raise "failed to parse ISO message"
   end
 
   # utilities

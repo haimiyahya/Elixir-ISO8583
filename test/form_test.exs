@@ -157,4 +157,46 @@ defmodule FormTest do
 
   end
 
+
+  test "test form msg 2" do
+    msg_map = %{
+      3 => "930000",
+      4 => "000000000010",
+      11 => "000001",
+      24 => "000",
+      41 => "1234567890123456",
+      42 => "123456789012345",
+      61 => "123",
+      64 => "123",
+    }
+    scheme = :ascii
+    master_spec = [{3, 0, :num, 6}, {4, 0, :num, 12}, {11, 0, :num, 6}, {24, 0, :num, 3}, {41, 3, :alphanum, 16}, {42, 3, :alphanum, 15}, {61, 3, :alphanum, 10}, {64, 3, :alphanum, 10}]
+
+    #manually_formed = Base.decode16!("16") <> Base.decode16!("1234567890123456")
+    #manually_formed = manually_formed <> "12345678"
+    #manually_formed = manually_formed <> "123456789012345"
+
+    formed = Form.form_fields(msg_map, scheme, master_spec)
+
+    IO.inspect formed
+    #assert(formed == manually_formed)
+
+    #manually_formed = <<0b01000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b11000000, 0b00000000, 0b00000000>> <> manually_formed
+    #formed = Form.form_msg(msg_map, scheme, master_spec)
+    #assert(formed == manually_formed)
+
+  end
+
+
+  msg = %{
+    3 => "930000",
+    4 => "000000000010",
+    11 => "000001",
+    24 => "000",
+    41 => "1234567890123456",
+    42 => "123456789012345",
+    61 => "123",
+    64 => "123",
+  }
+
 end

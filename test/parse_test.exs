@@ -336,4 +336,173 @@ defmodule ParseTest do
 
   end
 
+  test "parse eCard txn" do
+
+    iso_spec = [
+      {2, 2, :num, 19},
+      {3, 0, :num, 6},
+      {4, 0, :num, 12},
+      {7, 0, :num, 10},
+      {11, 0, :num, 6},
+      {12, 0, :num, 6},
+      {13, 0, :num, 4},
+      {14, 0, :num, 4},
+      {15, 0, :num, 4},
+      {17, 0, :num, 4},
+      {18, 0, :num, 4},
+      {22, 0, :num, 3},
+      {23, 0, :num, 3},
+      {25, 0, :num, 2},
+      {27, 0, :num, 1},
+      {30, 0, :num, 9},
+      {32, 2, :num, 11},
+      {35, 2, :num, 37},
+      {37, 0, :num, 12},
+      {38, 0, :num, 6},
+      {39, 0, :num, 2},
+      {41, 0, :alphanum, 16},
+      {42, 0, :alphanum, 15},
+      {43, 0, :alphanum, 40},
+      {48, 3, :alphanum, 30},
+      {49, 0, :alphanum, 3},
+      {50, 0, :alphanum, 3},
+      {52, 0, :alphanum, 16},
+      {53, 0, :alphanum, 16},
+      {54, 3, :alphanum, 12},
+      {55, 3, :br, 999},
+      {60, 0, :alphanum, 19},
+      {61, 0, :alphanum, 22},
+      {64, 0, :alphanum, 16},
+      {66, 0, :alphanum, 1},
+      {70, 0, :alphanum, 3},
+      {74, 0, :alphanum, 10},
+      {75, 0, :alphanum, 10},
+      {76, 0, :alphanum, 10},
+      {77, 0, :alphanum, 10},
+      {80, 0, :alphanum, 10},
+      {81, 0, :alphanum, 10},
+      {86, 0, :alphanum, 16},
+      {87, 0, :alphanum, 16},
+      {88, 0, :alphanum, 16},
+      {89, 0, :alphanum, 16},
+      {90, 0, :alphanum, 42},
+      {97, 0, :alphanum, 17},
+      {99, 2, :alphanum, 11},
+      {100, 2, :alphanum, 11},
+      {120, 0, :alphanum, 9},
+      {123, 3, :alphanum, 153},
+      {125, 0, :alphanum, 15},
+      {128, 0, :alphanum, 16}
+    ]
+
+    msg = "600132000002003020058020C0001C0040000000000010650005780022013200347897139200999776D3812101999000000F3838353032393032303030303031303238393032393034003330313A50313A3030303537383A563A30313035313934303031303635303130363D001530323A3030303030303030313036350003000001"
+
+    <<tpdu::binary-size(10), mti::binary-size(4), data::binary>> = msg
+
+    decoded = Base.decode16!(data)
+
+    encoding_scheme = :ascii
+
+    Parse.parse_msg(decoded, encoding_scheme, iso_spec)
+  end
+
+  test "parse eCard txn 2" do
+
+    iso_spec = [
+      {2, 2, :num, 19},
+      {3, 0, :num, 6},
+      {4, 0, :num, 12},
+      {5, 0, :num, 12},
+      {6, 0, :num, 12},
+      {7, 0, :num, 10},
+      {8, 0, :num, 8},
+      {9, 0, :num, 8},
+      {10, 0, :num, 8},
+      {11, 0, :num, 6},
+      {12, 0, :num, 6},
+      {13, 0, :num, 4},
+      {14, 0, :num, 4},
+      {15, 0, :num, 4},
+      {16, 0, :num, 4},
+      {17, 0, :num, 4},
+      {18, 0, :num, 4},
+      {19, 0, :num, 3},
+      {20, 0, :num, 3},
+      {21, 0, :num, 3},
+      {22, 0, :num, 3},
+      {23, 0, :num, 3},
+      {24, 0, :num, 3},
+      {25, 0, :num, 2},
+      {26, 0, :num, 2},
+      {27, 0, :num, 1},
+      {28, 0, :num, 8},
+      {29, 0, :num, 8},
+      {30, 0, :num, 8},
+      {31, 0, :num, 8},
+      {32, 2, :num, 11},
+      {33, 2, :num, 11},
+      {34, 2, :num, 28},
+      {35, 2, :num, 37},
+      {36, 3, :num, 104},
+      {37, 0, :num, 12},
+      {38, 0, :num, 6},
+      {39, 0, :num, 2},
+      {40, 0, :alphanum, 3},
+      {41, 0, :alphanum, 16},
+      {42, 0, :alphanum, 15},
+      {43, 0, :alphanum, 40},
+      {44, 2, :alphanum, 25},
+      {45, 2, :alphanum, 76},
+      {46, 3, :alphanum, 999},
+      {47, 3, :alphanum, 999},
+      {48, 3, :alphanum, 30},
+      {49, 0, :alphanum, 3},
+      {50, 0, :alphanum, 3},
+      {51, 0, :alphanum, 3},
+      {52, 0, :alphanum, 16},
+      {53, 0, :alphanum, 16},
+      {54, 3, :alphanum, 12},
+      {55, 3, :br, 999},
+      {56, 3, :alphanum, 999},
+      {57, 3, :alphanum, 999},
+      {58, 3, :alphanum, 999},
+      {59, 3, :alphanum, 999},
+      {60, 3, :alphanum, 999},
+      {61, 3, :alphanum, 999},
+      {62, 3, :alphanum, 999},
+      {63, 3, :alphanum, 999},
+      {64, 0, :alphanum, 16},
+      {66, 0, :alphanum, 1},
+      {70, 0, :alphanum, 3},
+      {74, 0, :alphanum, 10},
+      {75, 0, :alphanum, 10},
+      {76, 0, :alphanum, 10},
+      {77, 0, :alphanum, 10},
+      {80, 0, :alphanum, 10},
+      {81, 0, :alphanum, 10},
+      {86, 0, :alphanum, 16},
+      {87, 0, :alphanum, 16},
+      {88, 0, :alphanum, 16},
+      {89, 0, :alphanum, 16},
+      {90, 0, :alphanum, 42},
+      {97, 0, :alphanum, 17},
+      {99, 2, :alphanum, 11},
+      {100, 2, :alphanum, 11},
+      {120, 0, :alphanum, 9},
+      {123, 3, :alphanum, 153},
+      {125, 0, :alphanum, 15},
+      {128, 0, :alphanum, 16}
+    ]
+
+    msg = "600132000002003020058020C0001C00400000000000072800062600220132003838353032393032303030303031303238393032393034003330313A50313A3030303532353A563A30313033353439303030373238303130363D002630323A3030303030303030303732383A303137373437343730330006303030303031"
+
+    <<tpdu::binary-size(10), mti::binary-size(4), data::binary>> = msg
+
+    decoded = Base.decode16!(data)
+
+    encoding_scheme = :bin
+
+    Parse.parse_msg(decoded, encoding_scheme, iso_spec)
+  end
+
 end
