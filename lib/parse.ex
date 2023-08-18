@@ -5,20 +5,36 @@ defmodule ElixirISO8583.Parse do
 
     spec = list_of_pos |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
 
-    IO.inspect spec
+    list_of_spec_not_defined = spec |> Enum.filter(fn {result, _position, _spec} -> result == :error end) |> Enum.map(fn {_result, position, _spec} -> position end)
 
-    parse_fields(msg_data, scheme, spec, %{})
+    if length(list_of_spec_not_defined) > 0 do
+      {:error, "this fields spec was not defined #{list_of_spec_not_defined}"}
+    else
+      spec = spec |> Enum.map(fn {_result, _position, spec} -> spec end)
+      parse_fields(:ok, msg_data, scheme, spec, %{})
+    end
+
   end
 
-  def parse_fields(_msg, _scheme, [], output) do
-    output # return the parsed msg
+  def parse_fields({:error, field_number, error, error_msg, spec, msg, success_parsed}, _msg, _scheme, _spec, output) do
+    {{:error, field_number, error, error_msg, spec, msg, Base.encode16(msg), success_parsed}, output}
   end
 
-  def parse_fields(msg, scheme, spec, output) do
+  def parse_fields(:ok, _msg, _scheme, [], output) do
+    {:ok, output} # return the parsed msg
+  end
+
+  def parse_fields(:ok, msg, scheme, spec, output) do
     [{pos, head_size, data_type, max} | rest_of_spec] = spec
-    {data, rest_of_msg} = field(msg, scheme, head_size, data_type, max)
-    output = Map.put(output, pos, data)
-    parse_fields(rest_of_msg, scheme, rest_of_spec, output) # call itself with the next list of field spec
+
+    {result, output, rest_of_msg} =
+      case field(msg, scheme, head_size, data_type, max) do
+        {:ok, data, rest_of_msg} -> {:ok, Map.put(output, pos, data), rest_of_msg}
+        {:error, error, error_msg, rest_of_msg} -> {{:error, pos, error, error_msg, spec, msg, output}, %{}, <<>>}
+      end
+
+      # todo, if result supplied as :error dont proceed
+      parse_fields(result, rest_of_msg, scheme, rest_of_spec, output) # call itself with the next list of field spec
 
   end
 
@@ -26,7 +42,6 @@ defmodule ElixirISO8583.Parse do
     when head_size in [0, 1, 2, 3, 4] do
 
     {data_length, rest} = head(msg, scheme, head_size)
-
     data_length = data_length(data_length, max) # either use head size of fixed length (use max)
     body(rest, scheme, data_type, data_length) # get body value
 
@@ -39,11 +54,15 @@ defmodule ElixirISO8583.Parse do
     {data_length, rest}
   end
 
-  def head(<<_a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) # 3 digits is 2 bytes, first nible is ignored
+  def head(<<a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) # 3 digits is 2 bytes, first nible is ignored
     when b >= 0 and b <= 9 and c >= 0 and c <= 9 and d >= 0 and d <= 9 do
 
+      if a > 0 do
+        IO.inspect "Error: Invalid header format, the first nibble value should be 0, found #{a}"
+      end
+
       data_length = b*100 + c*10 + d
-    {data_length, rest}
+      {data_length, rest}
   end
 
   # ascii head
@@ -64,51 +83,64 @@ defmodule ElixirISO8583.Parse do
   end
 
   ## parse body
-  def body(msg, _scheme, _data_type = :alphanum, data_length) when byte_size(msg) >= data_length do # alphanum always 1 byte for any scheme
+  def body(msg, _scheme, _data_type = :alphanum, data_length)
+    when byte_size(msg) >= data_length do # alphanum always 1 byte for any scheme
 
-  IO.inspect Base.encode16(msg)
-  IO.inspect data_length
+    <<data::binary-size(data_length), rest::binary>> = msg
 
-  <<data::binary-size(data_length), rest::binary>> = msg
-    {data, rest}
+    {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :bin, data_type, data_length) when byte_size(msg) >= div(data_length + rem(data_length, 2), 2) # scheme binary, numeric and track2 for each digit is represented with half byte
-    when data_type in [:num, :z] do
+  def body(msg, _scheme, _data_type = :alphanum, data_length) when byte_size(msg) < data_length do
+    {:error, :insufficient_data, "Insufficient data to parse, required: #{data_length}, available data: #{byte_size(msg)}", msg}
+  end
+
+  def body(msg, _scheme = :bin, data_type, data_length)
+    when byte_size(msg) >= div(data_length + rem(data_length, 2), 2) and data_type in [:num, :z] do
+
     byte_length = data_length + rem(data_length, 2) |> div(2)
 
     <<data::binary-size(byte_length), rest::binary>> = msg
     data = Base.encode16(data) |> truncate(data_length)
 
-    {data, rest}
+    {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :bin, _data_type = :b, data_length) when byte_size(msg) >= data_length do # scheme binary, binary data represented as raw binary
+  def body(msg, _scheme = :bin, _data_type = :b, data_length)
+    when byte_size(msg) >= data_length do # scheme binary, binary data represented as raw binary
     <<data::binary-size(data_length), rest::binary>> = msg
-    {data, rest}
+    {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :ascii, data_type, data_length) when byte_size(msg) >= data_length # scheme ascii, numeric and track2 for each digit is represented with 1 byte
-   when data_type in [:num, :z] do
+  def body(msg, _scheme = :ascii, data_type, data_length)
+    when byte_size(msg) >= data_length # scheme ascii, numeric and track2 for each digit is represented with 1 byte
+    and data_type in [:num, :z] do
+
     <<data::binary-size(data_length), rest::binary>> = msg
-    {data, rest}
+    {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :ascii, _data_type = :b, data_length) when byte_size(msg) >= data_length*2 do # scheme ascii, binary data represented as hex in ascii
+  def body(msg, _scheme = :ascii, _data_type = :b, data_length)
+    when byte_size(msg) >= data_length*2 do # scheme ascii, binary data represented as hex in ascii
+
     data_length = data_length*2
+
     <<data::binary-size(data_length), rest::binary>> = msg
     data = Base.decode16!(data)
-    {data, rest}
+    {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :ascii, _data_type = :br, data_length) when byte_size(msg) >= data_length do # scheme ascii, raw binary data represented as raw binary
+  def body(msg, _scheme = :ascii, _data_type = :br, data_length)
+    when byte_size(msg) >= data_length do # scheme ascii, raw binary data represented as raw binary
+
     data_length = data_length
+
     <<data::binary-size(data_length), rest::binary>> = msg
-    {data, rest}
+    {:ok, data, rest}
   end
 
   def body(msg, _scheme, _data_type, _data_length) do
-    raise "failed to parse ISO message"
+    {:error, :general_error, "Failed to parse ISO message"}
   end
 
   # utilities
@@ -172,7 +204,14 @@ defmodule ElixirISO8583.Parse do
     [head | tail] = pos_list
 
     spec = Enum.find(master_list, fn {x, _, _, _} -> x == head end)
-    get_msg_field_spec(tail, master_list, [spec | output])
+
+    find_spec_result = case spec do
+      nil -> {:error, head, nil}
+      spec -> {:ok, head, spec}
+    end
+
+    get_msg_field_spec(tail, master_list, [find_spec_result | output])
+
   end
 
 end

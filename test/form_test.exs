@@ -135,7 +135,7 @@ defmodule FormTest do
 
     # result = Form.parse_msg(msg_multiple, :ascii, [{2, 3, :br, 40}, {3, 0, :br, 18}], %{})
 
-    # IO.inspect result
+
 
   end
 
@@ -178,7 +178,7 @@ defmodule FormTest do
 
     formed = Form.form_fields(msg_map, scheme, master_spec)
 
-    IO.inspect formed
+
     #assert(formed == manually_formed)
 
     #manually_formed = <<0b01000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b11000000, 0b00000000, 0b00000000>> <> manually_formed
