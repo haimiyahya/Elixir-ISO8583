@@ -32,25 +32,25 @@ defmodule ElixirISO8583.Parse do
     parse_fields(:ok, data_sections, scheme, iso_element_specs, %{})
   end
 
-  def parse_fields({:error, field_number, error, error_msg, spec, msg, success_parsed}, _msg, _scheme, _spec, output) do
-    {{:error, field_number, error, error_msg, spec, msg, Base.encode16(msg), success_parsed}, output}
+  def parse_fields({:error, field_number, error, error_msg, iso_element_specs, msg, success_parsed}, _msg, _scheme, _spec, parsed_elements) do
+    {{:error, field_number, error, error_msg, iso_element_specs, msg, Base.encode16(msg), success_parsed}, parsed_elements}
   end
 
-  def parse_fields(:ok, _msg, _scheme, [], output) do
-    {:ok, output} # return the parsed msg
+  def parse_fields(:ok, _data_sections, _scheme, [], parsed_elements) do
+    {:ok, parsed_elements} # return the parsed msg
   end
 
-  def parse_fields(:ok, msg, scheme, spec, output) do
-    [{pos, head_size, data_type, max} | rest_of_spec] = spec
+  def parse_fields(:ok, data_sections, scheme, iso_element_specs, parsed_elements) do
+    [{pos, head_size, data_type, max} | rest_of_spec] = iso_element_specs
 
-    {result, output, rest_of_msg} =
-      case field(msg, scheme, head_size, data_type, max) do
-        {:ok, data, rest_of_msg} -> {:ok, Map.put(output, pos, data), rest_of_msg}
-        {:error, error, error_msg, _rest_of_msg} -> {{:error, pos, error, error_msg, spec, msg, output}, %{}, <<>>}
+    {result, parsed_elements, rest_of_msg} =
+      case field(data_sections, scheme, head_size, data_type, max) do
+        {:ok, data, rest_of_msg} -> {:ok, Map.put(parsed_elements, pos, data), rest_of_msg}
+        {:error, error, error_msg, _rest_of_msg} -> {{:error, pos, error, error_msg, iso_element_specs, data_sections, parsed_elements}, %{}, <<>>}
       end
 
       # todo, if result supplied as :error dont proceed
-      parse_fields(result, rest_of_msg, scheme, rest_of_spec, output) # call itself with the next list of field spec
+      parse_fields(result, rest_of_msg, scheme, rest_of_spec, parsed_elements) # call itself with the next list of field spec
 
   end
 
