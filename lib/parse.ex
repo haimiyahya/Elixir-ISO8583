@@ -2,20 +2,34 @@ defmodule ElixirISO8583.Parse do
 
   @type bitmap_pos() :: 1..128
 
-  def parse_msg(message, scheme, master_spec) do
-    {:ok, list_of_pos, msg_data} = parse_bmp(scheme, message)
+  def parse_msg(message, scheme, iso_spec_config) do
+    {:ok, list_of_elements, data_sections} = parse_bmp(scheme, message)
 
-    spec = list_of_pos |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
+    iso_element_specs =
+      list_of_elements
+      |> Enum.sort
+      |> get_msg_field_spec(iso_spec_config)
+      |> Enum.reverse
 
-    list_of_spec_not_defined = spec |> Enum.filter(fn {result, _position, _spec} -> result == :error end) |> Enum.map(fn {_result, position, _spec} -> position end)
+    not_defined_iso_element_specs =
+      iso_element_specs
+      |> Enum.filter(fn {result, _position, _spec} -> result == :error end)
+      |> Enum.map(fn {_result, position, _spec} -> position end)
 
-    if length(list_of_spec_not_defined) > 0 do
-      {:error, "this fields spec was not defined #{list_of_spec_not_defined}"}
+    if length(not_defined_iso_element_specs) > 0 do
+      {:error, "this fields spec was not defined #{not_defined_iso_element_specs}"}
     else
-      spec = spec |> Enum.map(fn {_result, _position, spec} -> spec end)
-      parse_fields(:ok, msg_data, scheme, spec, %{})
+      iso_element_specs =
+        iso_element_specs
+        |> Enum.map(fn {_result, _position, element_spec} -> element_spec end)
+
+      parse_fields(data_sections, scheme, iso_element_specs)
     end
 
+  end
+
+  def parse_fields(data_sections, scheme, iso_element_specs) do
+    parse_fields(:ok, data_sections, scheme, iso_element_specs, %{})
   end
 
   def parse_fields({:error, field_number, error, error_msg, spec, msg, success_parsed}, _msg, _scheme, _spec, output) do
