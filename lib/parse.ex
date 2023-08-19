@@ -1,7 +1,9 @@
 defmodule ElixirISO8583.Parse do
 
-  def parse_msg(msg, scheme, master_spec) do
-    {list_of_pos, msg_data} = bmp(scheme, msg)
+  @type bitmap_pos() :: 1..128
+
+  def parse_msg(message, scheme, master_spec) do
+    {:ok, list_of_pos, msg_data} = parse_bmp(scheme, message)
 
     spec = list_of_pos |> Enum.sort |> get_msg_field_spec(master_spec) |> Enum.reverse # from the map, get the list of pos, then get the list of spec, the end result is: [{2, 2, :num, 19}, {42, 0, :alphanum, 15}]
 
@@ -30,7 +32,7 @@ defmodule ElixirISO8583.Parse do
     {result, output, rest_of_msg} =
       case field(msg, scheme, head_size, data_type, max) do
         {:ok, data, rest_of_msg} -> {:ok, Map.put(output, pos, data), rest_of_msg}
-        {:error, error, error_msg, rest_of_msg} -> {{:error, pos, error, error_msg, spec, msg, output}, %{}, <<>>}
+        {:error, error, error_msg, _rest_of_msg} -> {{:error, pos, error, error_msg, spec, msg, output}, %{}, <<>>}
       end
 
       # todo, if result supplied as :error dont proceed
@@ -139,7 +141,7 @@ defmodule ElixirISO8583.Parse do
     {:ok, data, rest}
   end
 
-  def body(msg, _scheme, _data_type, _data_length) do
+  def body(_msg, _scheme, _data_type, _data_length) do
     {:error, :general_error, "Failed to parse ISO message"}
   end
 
@@ -161,26 +163,59 @@ defmodule ElixirISO8583.Parse do
     data_length
   end
 
-  # bitmap parsing
-  def bmp(:ascii, msg = <<first_char::8, _rest::binary>>)
+
+
+  @doc """
+  Parse the bitmap according to the encoding scheme which is binary (the bitmap represented as 8 byte if the first bit is not set or 16 byte if the first bit is set)
+  or ascii (the bitmap represented as 16 byte if the first bit is not set or 32 byte if the first bit is set).
+
+  For the ascii encoding scheme, each 4 bit is represented as an ascii character in hex (between '0' to 'F')
+
+  Returns `{:ok, list}` if the bitmap is valid
+
+  ## Examples
+
+      iex> ElixirISO8583.Parse.parse_bmp("58020C0001C00400000000000072800062600220132003838353032393032303030303031303238393032393034003330313A50313A3030303532353A563A30313033353439303030373238303130363D002630323A3030303030303030303732383A303137373437343730330006303030303031")
+      {:ok, "58020C0001C00400000000000072800062600220132003838353032393032303030303031303238393032393034003330313A50313A3030303532353A563A30313033353439303030373238303130363D002630323A3030303030303030303732383A303137373437343730330006303030303031"}
+
+  """
+  def parse_bmp(:ascii, msg = <<first_char::8, _rest::binary>>)
     when first_char > ?0 and first_char < ?8 do # if the first bit is not set, the message only contains first bmp
-    <<bitmap::binary-size(16), rest::binary>> = msg
-    <<0::1, bmp::63>> = Base.decode16!(bitmap)
-    {bitmap_to_list(<<0::1, bmp::63>>), rest}
+
+    <<bitmap::binary-size(16), data_sections::binary>> = msg
+
+    if String.match?(bitmap, ~r/^[0-9A-F]{16}$/) == true do
+      <<_::1, bmp::63>> = Base.decode16!(bitmap)
+      list_of_elements = bitmap_to_list(<<0::1, bmp::63>>)
+      {:ok, list_of_elements, data_sections}
+    else
+      {:error, "Error: Bitmap contains character other than 0-9 and A-F"}
+    end
+
   end
 
-  def bmp(:ascii, msg) do
-    <<bitmap::binary-size(32), rest::binary>> = msg # the msg contains both bitmap
-    <<1::1, bmp::127>> = Base.decode16!(bitmap)
-    {bitmap_to_list(<<0::1, bmp::127>>), rest}
+  def parse_bmp(:ascii, msg) do
+
+    <<bitmap::binary-size(32), data_sections::binary>> = msg # the msg contains both bitmap
+
+    if String.match?(bitmap, ~r/^[0-9A-F]{32}$/) == true do
+      <<_::1, bmp::127>> = Base.decode16!(bitmap)
+      list_of_elements = bitmap_to_list(<<0::1, bmp::127>>)
+      {:ok, list_of_elements, data_sections}
+    else
+      {:error, "Error: Bitmap contains character other than 0-9 and A-F"}
+    end
+
   end
 
-  def bmp(:bin, <<0::1, bmp::63, rest::binary>>) do
-    {bitmap_to_list(<<0::1, bmp::63>>), rest} # if the first bit is not set, the message only contains first bmp
+  def parse_bmp(:bin, <<0::1, bmp::63, data_sections::binary>>) do
+    list_of_elements = bitmap_to_list(<<0::1, bmp::63>>)
+    {:ok, list_of_elements, data_sections}
   end
 
-  def bmp(:bin, <<1::1, bmp::127, rest::binary>>) do
-    {bitmap_to_list(<<0::1, bmp::127>>), rest} # the msg contains both bitmap
+  def parse_bmp(:bin, <<1::1, bmp::127, data_sections::binary>>) do
+    list_of_elements = bitmap_to_list(<<0::1, bmp::127>>)
+    {:ok, list_of_elements, data_sections}
   end
 
   def bitmap_to_list(bitmap) do # conver the bmp binary to a list
