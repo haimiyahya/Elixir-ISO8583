@@ -130,7 +130,7 @@ defmodule ElixirISO8583.Parse do
   end
 
   def body(msg, _scheme = :bin, data_type, data_length)
-    when byte_size(msg) >= div(data_length + rem(data_length, 2), 2) and data_type in [:num, :z] do
+    when div(data_length + rem(data_length, 2), 2) <= byte_size(msg) and data_type in [:num, :z] do
 
     byte_length = data_length + rem(data_length, 2) |> div(2)
 
@@ -140,38 +140,84 @@ defmodule ElixirISO8583.Parse do
     {:ok, data, rest}
   end
 
+  def body(msg, _scheme = :bin, data_type, data_length) when data_type in [:num, :z] do
+
+    byte_length = data_length + rem(data_length, 2) |> div(2)
+    available_data_length = byte_size(msg)
+
+    {:error, {:insufficient_data, "Insufficient data to parse, required: #{byte_length}, available data: #{available_data_length}"}}
+  end
+
   def body(msg, _scheme = :bin, _data_type = :b, data_length)
-    when byte_size(msg) >= data_length do # scheme binary, binary data represented as raw binary
+    when data_length <= byte_size(msg) do # scheme binary, binary data represented as raw binary
     <<data::binary-size(data_length), rest::binary>> = msg
     {:ok, data, rest}
+  end
+
+  def body(msg, _scheme = :bin, _data_type = :b, data_length) do
+
+    byte_length = data_length + rem(data_length, 2) |> div(2)
+    available_data_length = byte_size(msg)
+
+    {:error, {:insufficient_data, "Insufficient data to parse, required: #{byte_length}, available data: #{available_data_length}"}}
+
   end
 
   def body(msg, _scheme = :ascii, data_type, data_length)
-    when byte_size(msg) >= data_length # scheme ascii, numeric and track2 for each digit is represented with 1 byte
+    when data_length <= byte_size(msg)  # scheme ascii, numeric and track2 for each digit is represented with 1 byte
     and data_type in [:num, :z] do
 
     <<data::binary-size(data_length), rest::binary>> = msg
+
     {:ok, data, rest}
   end
 
+  def body(msg, _scheme = :ascii, data_type, data_length) when data_type in [:num, :z] do
+
+    byte_length = data_length + rem(data_length, 2) |> div(2)
+    available_data_length = byte_size(msg)
+
+    {:error, {:insufficient_data, "Insufficient data to parse, required: #{byte_length}, available data: #{available_data_length}"}}
+
+  end
+
   def body(msg, _scheme = :ascii, _data_type = :b, data_length)
-    when byte_size(msg) >= data_length*2 do # scheme ascii, binary data represented as hex in ascii
+    when data_length*2 <= byte_size(msg) do # scheme ascii, binary data represented as hex in ascii
 
     data_length = data_length*2
 
     <<data::binary-size(data_length), rest::binary>> = msg
     data = Base.decode16!(data)
+
     {:ok, data, rest}
   end
 
+  def body(msg, _scheme = :ascii, _data_type = :b, data_length) do
+    byte_length = data_length + rem(data_length, 2) |> div(2)
+    available_data_length = byte_size(msg)
+
+    {:error, {:insufficient_data, "Insufficient data to parse, required: #{byte_length}, available data: #{available_data_length}"}}
+
+  end
+
   def body(msg, _scheme = :ascii, _data_type = :br, data_length)
-    when byte_size(msg) >= data_length do # scheme ascii, raw binary data represented as raw binary
+    when data_length <= byte_size(msg) do # scheme ascii, raw binary data represented as raw binary
 
     data_length = data_length
 
     <<data::binary-size(data_length), rest::binary>> = msg
     {:ok, data, rest}
   end
+
+
+  def body(msg, _scheme = :ascii, _data_type = :br, data_length) do
+    byte_length = data_length + rem(data_length, 2) |> div(2)
+    available_data_length = byte_size(msg)
+
+    {:error, {:insufficient_data, "Insufficient data to parse, required: #{byte_length}, available data: #{available_data_length}"}}
+
+  end
+
 
   def body(_msg, _scheme, _data_type, _data_length) do
     {:error, :general_error, "Failed to parse ISO message"}
