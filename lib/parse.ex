@@ -27,16 +27,16 @@ defmodule ElixirISO8583.Parse do
   end
 
   def parse_element(:ok, data_sections, scheme, iso_element_specs, parsed_elements) do
-    [{pos, head_size, data_type, max} | rest_of_spec] = iso_element_specs
+    [{element_pos, head_size, data_type, max} | rest_of_iso_element_specs] = iso_element_specs
 
-    {result, parsed_elements, rest_of_msg} =
+    {result, parsed_elements, rest_of_data_sections} =
       case field(data_sections, scheme, head_size, data_type, max) do
-        {:ok, data, rest_of_msg} -> {:ok, Map.put(parsed_elements, pos, data), rest_of_msg}
-        {:error, error, error_msg, _rest_of_msg} -> {{:error, pos, error, error_msg, iso_element_specs, data_sections, parsed_elements}, %{}, <<>>}
+        {:ok, data, rest_of_data_sections} -> {:ok, Map.put(parsed_elements, element_pos, data), rest_of_data_sections}
+        {:error, error, error_msg, _rest_of_msg} -> {{:error, element_pos, error, error_msg, iso_element_specs, data_sections, parsed_elements}, %{}, <<>>}
       end
 
       # todo, if result supplied as :error dont proceed
-      parse_element(result, rest_of_msg, scheme, rest_of_spec, parsed_elements) # call itself with the next list of field spec
+      parse_element(result, rest_of_data_sections, scheme, rest_of_iso_element_specs, parsed_elements) # call itself with the next list of field spec
 
   end
 
