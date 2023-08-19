@@ -4,6 +4,8 @@ defmodule ElixirISO8583.Parse do
 
   def parse_msg(message, scheme, iso_spec_config) do
 
+    # validate ISO spec config
+
     with {:ok, list_of_elements, data_sections} <- parse_bmp(scheme, message),
          {:ok, iso_element_specs} <- get_and_validate_iso_element_spec(list_of_elements, iso_spec_config) do
 
@@ -31,61 +33,81 @@ defmodule ElixirISO8583.Parse do
 
     parse_result =
       with {:ok, data, rest_of_data_sections} <- field(data_sections, scheme, head_size, data_type, max) do
-        parsed_elements = Map.put(parsed_elements, element_pos, data)
-        {:ok, nil, parsed_elements, rest_of_data_sections}
+
+        {:ok, nil, Map.put(parsed_elements, element_pos, data), rest_of_data_sections}
+
       else
         {:error, status_detail} ->
           {:error, status_detail, %{}, nil}
       end
 
-    {status, status_detail, parsed_elements, rest_of_data_sections} = parse_result
+    {parse_status, parse_detail, parsed_elements, rest_of_data_sections} = parse_result
 
-    parse_element(status, status_detail, {rest_of_data_sections, scheme, rest_of_iso_element_specs}, parsed_elements) # call itself with the next list of field spec
+    parse_element(parse_status, parse_detail, {rest_of_data_sections, scheme, rest_of_iso_element_specs}, parsed_elements) # call itself with the next list of field spec
 
   end
 
   def field(msg, scheme, head_size, data_type, max)
     when head_size in [0, 1, 2, 3, 4] do
 
-    {data_length, rest} = head(msg, scheme, head_size)
-    data_length = data_length(data_length, max) # either use head size of fixed length (use max)
-    body(rest, scheme, data_type, data_length) # get body value
+    # {:ok, data_length, rest} = head(msg, scheme, head_size)
 
+    with {:ok, data_length, rest} <- head(msg, scheme, head_size) do
+      data_length = data_length(data_length, max) # either use head size of fixed length (use max)
+      parse_body_result = body(rest, scheme, data_type, data_length) # get body value
+      parse_body_result
+    else
+      error -> error
+    end
+
+  end
+
+  def field(_msg, _scheme, head_size, _data_type, _max) do
+    {:error, "Invalid head size, expected 0-4 but having #{head_size}"}
   end
 
   # binary head
   def head(<<a::4, b::4, rest::binary>>, :bin, 2) # 2 digits is 1 byte, each number represented with half byte
     when a >= 0 and a <= 9 and b >= 0 and b <= 9 do
     data_length = a*10 + b
-    {data_length, rest}
+    {:ok, data_length, rest}
+  end
+
+  def head(<<a::4, b::4, rest::binary>>, :bin, 2) do
+    {:error, "Invalid binary header format, expected first and second nibble between 0-9 found a = #{a} and b = #{b}"}
   end
 
   def head(<<a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) # 3 digits is 2 bytes, first nible is ignored
     when b >= 0 and b <= 9 and c >= 0 and c <= 9 and d >= 0 and d <= 9 do
 
       if a > 0 do
-        IO.inspect "Error: Invalid header format, the first nibble value should be 0, found #{a}"
+        {:error, "Error: Invalid header format, the first nibble value should be 0, found #{a}"}
+      else
+        data_length = b*100 + c*10 + d
+        {:ok, data_length, rest}
       end
 
-      data_length = b*100 + c*10 + d
-      {data_length, rest}
+  end
+
+  def head(<<a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) do
+    {:error, "Invalid binary header format, expected first and second and third nibble between 0-9 found b = #{b} and c = #{c} and d = #{d}"}
   end
 
   # ascii head
   def head(<<_::4, a::4, _::4, b::4, rest::binary>>, :ascii, 2) # 2 digits is 2 bytes, each number represented with 1 byte, ignore the first nible for each byte (refer to ASCII spec)
     when a >= 0 and a <= 9 and b >= 0 and b <= 9 do
     data_length = a*10 + b
-    {data_length, rest}
+    {:ok, data_length, rest}
   end
 
   def head(<<_::4, a::4, _::4, b::4, _::4, c::4, rest::binary>>, :ascii, 3) # 3 digits is 3 bytes
     when a >= 0 and a <= 9 and b >= 0 and b <= 9 and c >= 0 and c <= 9 do
     data_length = a*100 + b*10 + c
-    {data_length, rest}
+    {:ok, data_length, rest}
   end
 
   def head(msg, _scheme, 0) do # 0 if fixed length
-    {0, msg}
+    {:ok, 0, msg}
   end
 
   ## parse body
