@@ -3,27 +3,13 @@ defmodule ElixirISO8583.Parse do
   @type bitmap_pos() :: 1..128
 
   def parse_msg(message, scheme, iso_spec_config) do
-    {:ok, list_of_elements, data_sections} = parse_bmp(scheme, message)
 
-    iso_element_specs =
-      list_of_elements
-      |> Enum.sort
-      |> get_msg_field_spec(iso_spec_config)
-      |> Enum.reverse
-
-    not_defined_iso_element_specs =
-      iso_element_specs
-      |> Enum.filter(fn {result, _position, _spec} -> result == :error end)
-      |> Enum.map(fn {_result, position, _spec} -> position end)
-
-    if length(not_defined_iso_element_specs) > 0 do
-      {:error, "this fields spec was not defined #{not_defined_iso_element_specs}"}
-    else
-      iso_element_specs =
-        iso_element_specs
-        |> Enum.map(fn {_result, _position, element_spec} -> element_spec end)
+    with {:ok, list_of_elements, data_sections} <- parse_bmp(scheme, message),
+         {:ok, iso_element_specs} <- get_and_validate_iso_element_spec(list_of_elements, iso_spec_config) do
 
       parse_fields(data_sections, scheme, iso_element_specs)
+    else
+      err -> err
     end
 
   end
@@ -261,6 +247,30 @@ defmodule ElixirISO8583.Parse do
 
     get_msg_field_spec(tail, master_list, [find_spec_result | output])
 
+  end
+
+  def get_and_validate_iso_element_spec(list_of_elements, iso_spec_config) do
+    iso_element_specs =
+      list_of_elements
+      |> Enum.sort
+      |> get_msg_field_spec(iso_spec_config)
+      |> Enum.reverse
+
+    not_defined_iso_element_specs =
+      iso_element_specs
+      |> Enum.filter(fn {result, _position, _spec} -> result == :error end)
+      |> Enum.map(fn {_result, position, _spec} -> position end)
+
+    if length(not_defined_iso_element_specs) > 0 do
+      {:error, "this fields spec was not defined #{not_defined_iso_element_specs}"}
+    else
+      iso_element_specs =
+        iso_element_specs
+        |> Enum.map(fn {_result, _position, element_spec} -> element_spec end)
+
+      #parse_fields(data_sections, scheme, iso_element_specs)
+      {:ok, iso_element_specs}
+    end
   end
 
 end
