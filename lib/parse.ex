@@ -266,18 +266,18 @@ defmodule ElixirISO8583.Parse do
     output
   end
 
-  def get_msg_field_spec(pos_list, master_list, output) do
+  def get_msg_field_spec(list_of_elements, iso_spec_config, iso_element_specs) do
 
-    [head | tail] = pos_list
+    [element_pos | rest_of_iso_element_specs] = list_of_elements
 
-    spec = Enum.find(master_list, fn {x, _, _, _} -> x == head end)
+    spec = Enum.find(iso_spec_config, fn {x, _, _, _} -> x == element_pos end)
 
     find_spec_result = case spec do
-      nil -> {:error, head, nil}
-      spec -> {:ok, head, spec}
+      nil -> {:error, element_pos, nil}
+      spec -> {:ok, element_pos, spec}
     end
 
-    get_msg_field_spec(tail, master_list, [find_spec_result | output])
+    get_msg_field_spec(rest_of_iso_element_specs, iso_spec_config, [find_spec_result | iso_element_specs])
 
   end
 
