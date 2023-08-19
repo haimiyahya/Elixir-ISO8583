@@ -15,28 +15,32 @@ defmodule ElixirISO8583.Parse do
   end
 
   def parse_elements(data_sections, scheme, iso_element_specs) do
-    parse_element(:ok, data_sections, scheme, iso_element_specs, %{})
+    parse_element(:ok, nil, {data_sections, scheme, iso_element_specs}, %{})
   end
 
-  def parse_element({:error, field_number, error, error_msg, iso_element_specs, msg, success_parsed}, _msg, _scheme, _spec, parsed_elements) do
-    {{:error, field_number, error, error_msg, iso_element_specs, msg, Base.encode16(msg), success_parsed}, parsed_elements}
+  def parse_element(:error, parse_status, _parse_input, _parsed_elements) do
+    {:error, parse_status}
   end
 
-  def parse_element(:ok, _data_sections, _scheme, [], parsed_elements) do
+  def parse_element(:ok, _parse_status, {_data_sections, _scheme, []}, parsed_elements) do
     {:ok, parsed_elements} # return the parsed msg
   end
 
-  def parse_element(:ok, data_sections, scheme, iso_element_specs, parsed_elements) do
+  def parse_element(:ok, _parse_status, {data_sections, scheme, iso_element_specs}, parsed_elements) do
     [{element_pos, head_size, data_type, max} | rest_of_iso_element_specs] = iso_element_specs
 
-    {result, parsed_elements, rest_of_data_sections} =
-      case field(data_sections, scheme, head_size, data_type, max) do
-        {:ok, data, rest_of_data_sections} -> {:ok, Map.put(parsed_elements, element_pos, data), rest_of_data_sections}
-        {:error, error, error_msg, _rest_of_msg} -> {{:error, element_pos, error, error_msg, iso_element_specs, data_sections, parsed_elements}, %{}, <<>>}
+    parse_result =
+      with {:ok, data, rest_of_data_sections} <- field(data_sections, scheme, head_size, data_type, max) do
+        parsed_elements = Map.put(parsed_elements, element_pos, data)
+        {:ok, nil, parsed_elements, rest_of_data_sections}
+      else
+        {:error, status_detail} ->
+          {:error, status_detail, %{}, nil}
       end
 
-      # todo, if result supplied as :error dont proceed
-      parse_element(result, rest_of_data_sections, scheme, rest_of_iso_element_specs, parsed_elements) # call itself with the next list of field spec
+    {status, status_detail, parsed_elements, rest_of_data_sections} = parse_result
+
+    parse_element(status, status_detail, {rest_of_data_sections, scheme, rest_of_iso_element_specs}, parsed_elements) # call itself with the next list of field spec
 
   end
 
@@ -94,7 +98,7 @@ defmodule ElixirISO8583.Parse do
   end
 
   def body(msg, _scheme, _data_type = :alphanum, data_length) when byte_size(msg) < data_length do
-    {:error, :insufficient_data, "Insufficient data to parse, required: #{data_length}, available data: #{byte_size(msg)}", msg}
+    {:error, {:insufficient_data, "Insufficient data to parse, required: #{data_length}, available data: #{byte_size(msg)}", msg}}
   end
 
   def body(msg, _scheme = :bin, data_type, data_length)
