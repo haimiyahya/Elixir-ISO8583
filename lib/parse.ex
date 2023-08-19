@@ -50,8 +50,6 @@ defmodule ElixirISO8583.Parse do
   def field(msg, scheme, head_size, data_type, max)
     when head_size in [0, 1, 2, 3, 4] do
 
-    # {:ok, data_length, rest} = head(msg, scheme, head_size)
-
     with {:ok, data_length, rest} <- head(msg, scheme, head_size) do
       data_length = data_length(data_length, max) # either use head size of fixed length (use max)
       parse_body_result = body(rest, scheme, data_type, data_length) # get body value
@@ -100,10 +98,18 @@ defmodule ElixirISO8583.Parse do
     {:ok, data_length, rest}
   end
 
+  def head(<<_::4, a::4, _::4, b::4, rest::binary>>, :ascii, 2) do
+    {:error, "Invalid binary header format, expected first and second nibble between 0-9 found a = #{a} and b = #{b}"}
+  end
+
   def head(<<_::4, a::4, _::4, b::4, _::4, c::4, rest::binary>>, :ascii, 3) # 3 digits is 3 bytes
     when a >= 0 and a <= 9 and b >= 0 and b <= 9 and c >= 0 and c <= 9 do
     data_length = a*100 + b*10 + c
     {:ok, data_length, rest}
+  end
+
+  def head(<<_::4, a::4, _::4, b::4, _::4, c::4, rest::binary>>, :ascii, 3) do
+    {:error, "Invalid binary header format, expected first and second and third nibble between 0-9 found a = #{a} and b = #{b} and c = #{c}"}
   end
 
   def head(msg, _scheme, 0) do # 0 if fixed length
