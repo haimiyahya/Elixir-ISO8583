@@ -1,23 +1,23 @@
 defmodule ElixirISO8583.Parse do
 
-  @type bitmap_pos() :: 1..128
+  @type scheme() :: :bin | :ascii
 
+  @spec parse_msg(binary(), scheme(), list()) :: {:ok, map()} | {:error, tuple()}
   def parse_msg(message, scheme, iso_spec_config) do
 
-    # validate ISO spec config
+    with {:ok, elements, data_sections} <- parse_bmp(scheme, message),
+         {:ok, element_specs} <- get_element_spec(elements, iso_spec_config) do
 
-    with {:ok, list_of_elements, data_sections} <- parse_bmp(scheme, message),
-         {:ok, iso_element_specs} <- get_and_validate_iso_element_spec(list_of_elements, iso_spec_config) do
-
-      parse_elements(data_sections, scheme, iso_element_specs)
+      parse_cursor = {data_sections, scheme, element_specs}
+      parse_elements(parse_cursor)
     else
       err -> err
     end
 
   end
 
-  def parse_elements(data_sections, scheme, iso_element_specs) do
-    parse_element(:ok, nil, {data_sections, scheme, iso_element_specs}, %{})
+  def parse_elements(parse_cursor) do
+    parse_element(:ok, nil, parse_cursor, %{})
   end
 
   def parse_element(:error, parse_status, _parse_input, _parsed_elements) do
@@ -327,7 +327,7 @@ defmodule ElixirISO8583.Parse do
 
   end
 
-  def get_and_validate_iso_element_spec(list_of_elements, iso_spec_config) do
+  def get_element_spec(list_of_elements, iso_spec_config) do
     iso_element_specs =
       list_of_elements
       |> Enum.sort
