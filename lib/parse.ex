@@ -1,8 +1,13 @@
 defmodule ElixirISO8583.Parse do
 
   @type scheme() :: :bin | :ascii
+  @type element_position() :: 1..128
+  @type header_digits() :: 0..3
+  @type data_type() :: :bin | :num | :alphanum | :z | :b | :br
+  @type max_length() :: 1..999
+  @type iso_element_spec() :: { element_position, header_digits, data_type, max_length }
 
-  @spec parse_msg(binary(), scheme(), list()) :: {:ok, map()} | {:error, tuple()}
+  @spec parse_msg(binary(), scheme, list(iso_element_spec)) :: {:ok, map()} | {:error, tuple()}
   def parse_msg(message, scheme, iso_spec_config) do
 
     with {:ok, elements, data_sections} <- parse_bmp(scheme, message),
@@ -16,18 +21,22 @@ defmodule ElixirISO8583.Parse do
 
   end
 
+  @spec parse_elements({binary(), scheme, list(iso_element_spec)}) :: {:ok, map()}
   def parse_elements(parse_cursor) do
     parse_element(:ok, nil, parse_cursor, %{})
   end
 
+  @spec parse_element(:error, tuple(), binary(), map()) :: {:error, tuple()}
   def parse_element(:error, parse_status, _parse_input, _parsed_elements) do
     {:error, parse_status}
   end
 
+  @spec parse_element(:ok, tuple(), {binary(), scheme, []}, map()) :: {:ok, map()}
   def parse_element(:ok, _parse_status, {_data_sections, _scheme, []}, parsed_elements) do
     {:ok, parsed_elements} # return the parsed msg
   end
 
+  @spec parse_element(:ok, tuple(), {binary(), scheme, list(iso_element_spec)}, map()) :: {:ok, any(), map()} | {:error, tuple(), map(), any()}
   def parse_element(:ok, _parse_status, {data_sections, scheme, iso_element_specs}, parsed_elements) do
     [{element_pos, head_size, data_type, max} | rest_of_iso_element_specs] = iso_element_specs
 
