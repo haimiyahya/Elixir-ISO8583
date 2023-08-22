@@ -41,7 +41,7 @@ defmodule ElixirISO8583.Parse do
     [{element_pos, head_size, data_type, max} | rest_of_iso_element_specs] = iso_element_specs
 
     parse_result =
-      with {:ok, data, rest_of_data_sections} <- field(data_sections, scheme, head_size, data_type, max) do
+      with {:ok, data, rest_of_data_sections} <- parse_field(data_sections, scheme, head_size, data_type, max) do
 
         {:ok, nil, Map.put(parsed_elements, element_pos, data), rest_of_data_sections}
 
@@ -58,12 +58,12 @@ defmodule ElixirISO8583.Parse do
 
   end
 
-  def field(msg, scheme, head_size, data_type, max)
+  def parse_field(msg, scheme, head_size, data_type, max)
     when head_size in [0, 1, 2, 3, 4] do
 
-    with {:ok, data_length, rest} <- head(msg, scheme, head_size) do
+    with {:ok, data_length, rest} <- parse_head(msg, scheme, head_size) do
       data_length = data_length(data_length, max) # either use head size of fixed length (use max)
-      parse_body_result = body(rest, scheme, data_type, data_length) # get body value
+      parse_body_result = parse_body(rest, scheme, data_type, data_length) # get body value
       parse_body_result
     else
       error -> error
@@ -71,22 +71,22 @@ defmodule ElixirISO8583.Parse do
 
   end
 
-  def field(_msg, _scheme, head_size, _data_type, _max) do
+  def parse_field(_msg, _scheme, head_size, _data_type, _max) do
     {:error, "Invalid head size, expected 0-4 but having #{head_size}"}
   end
 
   # binary head
-  def head(<<a::4, b::4, rest::binary>>, :bin, 2) # 2 digits is 1 byte, each number represented with half byte
+  def parse_head(<<a::4, b::4, rest::binary>>, :bin, 2) # 2 digits is 1 byte, each number represented with half byte
     when a >= 0 and a <= 9 and b >= 0 and b <= 9 do
     data_length = a*10 + b
     {:ok, data_length, rest}
   end
 
-  def head(<<a::4, b::4, rest::binary>>, :bin, 2) do
+  def parse_head(<<a::4, b::4, rest::binary>>, :bin, 2) do
     {:error, "Invalid binary header format, expected first and second nibble between 0-9 found a = #{a} and b = #{b}"}
   end
 
-  def head(<<a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) # 3 digits is 2 bytes, first nible is ignored
+  def parse_head(<<a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) # 3 digits is 2 bytes, first nible is ignored
     when b >= 0 and b <= 9 and c >= 0 and c <= 9 and d >= 0 and d <= 9 do
 
       if a > 0 do
@@ -98,12 +98,12 @@ defmodule ElixirISO8583.Parse do
 
   end
 
-  def head(<<a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) do
+  def parse_head(<<a::4, b::4, c::4, d::4, rest::binary>>, :bin, 3) do
     {:error, "Invalid binary header format, expected first and second and third nibble between 0-9 found b = #{b} and c = #{c} and d = #{d}"}
   end
 
   # ascii head
-  def head(<<_::4, a::4, _::4, b::4, rest::binary>>, :ascii, 2) # 2 digits is 2 bytes, each number represented with 1 byte, ignore the first nible for each byte (refer to ASCII spec)
+  def parse_head(<<_::4, a::4, _::4, b::4, rest::binary>>, :ascii, 2) # 2 digits is 2 bytes, each number represented with 1 byte, ignore the first nible for each byte (refer to ASCII spec)
     when a >= 0 and a <= 9 and b >= 0 and b <= 9 do
     data_length = a*10 + b
     {:ok, data_length, rest}
@@ -113,22 +113,22 @@ defmodule ElixirISO8583.Parse do
     {:error, "Invalid binary header format, expected first and second nibble between 0-9 found a = #{a} and b = #{b}"}
   end
 
-  def head(<<_::4, a::4, _::4, b::4, _::4, c::4, rest::binary>>, :ascii, 3) # 3 digits is 3 bytes
+  def parse_head(<<_::4, a::4, _::4, b::4, _::4, c::4, rest::binary>>, :ascii, 3) # 3 digits is 3 bytes
     when a >= 0 and a <= 9 and b >= 0 and b <= 9 and c >= 0 and c <= 9 do
     data_length = a*100 + b*10 + c
     {:ok, data_length, rest}
   end
 
-  def head(<<_::4, a::4, _::4, b::4, _::4, c::4, rest::binary>>, :ascii, 3) do
+  def parse_head(<<_::4, a::4, _::4, b::4, _::4, c::4, rest::binary>>, :ascii, 3) do
     {:error, "Invalid binary header format, expected first and second and third nibble between 0-9 found a = #{a} and b = #{b} and c = #{c}"}
   end
 
-  def head(msg, _scheme, 0) do # 0 if fixed length
+  def parse_head(msg, _scheme, 0) do # 0 if fixed length
     {:ok, 0, msg}
   end
 
   ## parse body
-  def body(msg, _scheme, _data_type = :alphanum, data_length)
+  def parse_body(msg, _scheme, _data_type = :alphanum, data_length)
     when byte_size(msg) >= data_length do # alphanum always 1 byte for any scheme
 
     <<data::binary-size(data_length), rest::binary>> = msg
@@ -136,11 +136,11 @@ defmodule ElixirISO8583.Parse do
     {:ok, data, rest}
   end
 
-  def body(msg, _scheme, _data_type = :alphanum, data_length) when byte_size(msg) < data_length do
+  def parse_body(msg, _scheme, _data_type = :alphanum, data_length) when byte_size(msg) < data_length do
     {:error, {:insufficient_data, "Insufficient data to parse, required: #{data_length}, available data: #{byte_size(msg)}", msg}}
   end
 
-  def body(msg, _scheme = :bin, data_type, data_length)
+  def parse_body(msg, _scheme = :bin, data_type, data_length)
     when div(data_length + rem(data_length, 2), 2) <= byte_size(msg) and data_type in [:num, :z] do
 
     byte_length = data_length + rem(data_length, 2) |> div(2)
@@ -151,7 +151,7 @@ defmodule ElixirISO8583.Parse do
     {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :bin, data_type, data_length) when data_type in [:num, :z] do
+  def parse_body(msg, _scheme = :bin, data_type, data_length) when data_type in [:num, :z] do
 
     byte_length = data_length + rem(data_length, 2) |> div(2)
     available_data_length = byte_size(msg)
@@ -159,13 +159,13 @@ defmodule ElixirISO8583.Parse do
     {:error, {:insufficient_data, "Insufficient data to parse, required: #{byte_length}, available data: #{available_data_length}"}}
   end
 
-  def body(msg, _scheme = :bin, _data_type = :b, data_length)
+  def parse_body(msg, _scheme = :bin, _data_type = :b, data_length)
     when data_length <= byte_size(msg) do # scheme binary, binary data represented as raw binary
     <<data::binary-size(data_length), rest::binary>> = msg
     {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :bin, _data_type = :b, data_length) do
+  def parse_body(msg, _scheme = :bin, _data_type = :b, data_length) do
 
     byte_length = data_length + rem(data_length, 2) |> div(2)
     available_data_length = byte_size(msg)
@@ -174,7 +174,7 @@ defmodule ElixirISO8583.Parse do
 
   end
 
-  def body(msg, _scheme = :ascii, data_type, data_length)
+  def parse_body(msg, _scheme = :ascii, data_type, data_length)
     when data_length <= byte_size(msg)  # scheme ascii, numeric and track2 for each digit is represented with 1 byte
     and data_type in [:num, :z] do
 
@@ -183,7 +183,7 @@ defmodule ElixirISO8583.Parse do
     {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :ascii, data_type, data_length) when data_type in [:num, :z] do
+  def parse_body(msg, _scheme = :ascii, data_type, data_length) when data_type in [:num, :z] do
 
     byte_length = data_length + rem(data_length, 2) |> div(2)
     available_data_length = byte_size(msg)
@@ -192,7 +192,7 @@ defmodule ElixirISO8583.Parse do
 
   end
 
-  def body(msg, _scheme = :ascii, _data_type = :b, data_length)
+  def parse_body(msg, _scheme = :ascii, _data_type = :b, data_length)
     when data_length*2 <= byte_size(msg) do # scheme ascii, binary data represented as hex in ascii
 
     data_length = data_length*2
@@ -203,7 +203,7 @@ defmodule ElixirISO8583.Parse do
     {:ok, data, rest}
   end
 
-  def body(msg, _scheme = :ascii, _data_type = :b, data_length) do
+  def parse_body(msg, _scheme = :ascii, _data_type = :b, data_length) do
     byte_length = data_length + rem(data_length, 2) |> div(2)
     available_data_length = byte_size(msg)
 
@@ -211,7 +211,7 @@ defmodule ElixirISO8583.Parse do
 
   end
 
-  def body(msg, _scheme = :ascii, _data_type = :br, data_length)
+  def parse_body(msg, _scheme = :ascii, _data_type = :br, data_length)
     when data_length <= byte_size(msg) do # scheme ascii, raw binary data represented as raw binary
 
     data_length = data_length
@@ -221,7 +221,7 @@ defmodule ElixirISO8583.Parse do
   end
 
 
-  def body(msg, _scheme = :ascii, _data_type = :br, data_length) do
+  def parse_body(msg, _scheme = :ascii, _data_type = :br, data_length) do
     byte_length = data_length + rem(data_length, 2) |> div(2)
     available_data_length = byte_size(msg)
 
@@ -230,7 +230,7 @@ defmodule ElixirISO8583.Parse do
   end
 
 
-  def body(_msg, _scheme, _data_type, _data_length) do
+  def parse_body(_msg, _scheme, _data_type, _data_length) do
     {:error, :general_error, "Failed to parse ISO message"}
   end
 
