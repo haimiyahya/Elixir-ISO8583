@@ -43,7 +43,9 @@ defmodule ElixirISO8583.Parse do
 
     {parse_status, parse_detail, parsed_elements, rest_of_data_sections} = parse_result
 
-    parse_element(parse_status, parse_detail, {rest_of_data_sections, scheme, rest_of_iso_element_specs}, parsed_elements) # call itself with the next list of field spec
+    parse_cursor = {rest_of_data_sections, scheme, rest_of_iso_element_specs}
+
+    parse_element(parse_status, parse_detail, parse_cursor, parsed_elements) # call itself with the next list of field spec
 
   end
 
