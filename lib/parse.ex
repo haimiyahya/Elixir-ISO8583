@@ -38,24 +38,25 @@ defmodule ElixirISO8583.Parse do
 
   @spec parse_element(:ok, tuple(), {binary(), scheme, list(iso_element_spec)}, map()) :: {:ok, any(), map()} | {:error, tuple(), map(), any()}
   def parse_element(:ok, _parse_status, {data_sections, scheme, iso_element_specs}, parsed_elements) do
-    [{element_pos, head_size, data_type, max} | rest_of_iso_element_specs] = iso_element_specs
+    [spec = {element_pos, head_size, data_type, max} | rest_of_iso_element_specs] = iso_element_specs
 
-    parse_result =
-      with {:ok, data, rest_of_data_sections} <- parse_field(data_sections, scheme, head_size, data_type, max) do
-
-        {:ok, nil, Map.put(parsed_elements, element_pos, data), rest_of_data_sections}
-
-      else
-        {:error, status_detail} ->
-          {:error, status_detail, %{}, nil}
-      end
-
-    {parse_status, parse_detail, parsed_elements, rest_of_data_sections} = parse_result
+    {parse_status, parse_detail, parsed_elements, rest_of_data_sections} = process_parse_field(data_sections, scheme, spec, parsed_elements)
 
     parse_cursor = {rest_of_data_sections, scheme, rest_of_iso_element_specs}
 
     parse_element(parse_status, parse_detail, parse_cursor, parsed_elements) # call itself with the next list of field spec
 
+  end
+
+  def process_parse_field(data_sections, scheme, {element_pos, head_size, data_type, max}, parsed_elements) do
+    with {:ok, data, rest_of_data_sections} <- parse_field(data_sections, scheme, head_size, data_type, max) do
+
+      {:ok, nil, Map.put(parsed_elements, element_pos, data), rest_of_data_sections}
+
+    else
+      {:error, status_detail} ->
+        {:error, status_detail, %{}, nil}
+    end
   end
 
   def parse_field(msg, scheme, head_size, data_type, max)
